@@ -1,0 +1,21 @@
+{
+  "skills": [
+    {"name": "Full-Stack Development", "aliases": ["full stack", "fullstack"]},
+    {"name": "Backend Engineering", "aliases": ["backend", "back end", "server-side"]},
+    "Python",
+    {"name": "R", "aliases": ["R programming", "RStudio"]},
+    {"name": "JavaScript", "aliases": ["JS", "Node.js"]},
+    "PHP",
+    {"name": "API Development", "aliases": ["REST API", "RESTful", "web services"]},
+    {"name": "GCP", "aliases": ["Google Cloud", "Google Cloud Platform"]},
+    "Linux",
+    {"name": "SQL", "aliases": ["PostgreSQL", "Postgres", "MySQL", "T-SQL"]},
+    {"name": "Git", "aliases": ["GitHub", "GitLab"]},
+    {"name": "Systems Architecture", "aliases": ["system design", "solution architecture", "software architecture"]},
+    {"name": "Technical Specifications", "aliases": ["requirements gathering", "requirements analysis"]},
+    {"name": "Automated Testing", "aliases": ["unit testing", "test automation"]},
+    {"name": "Automation", "aliases": ["automate"]},
+    {"name": "DevOps", "aliases": ["CI/CD"]},
+    {"name": "Mentorship", "aliases": ["mentoring", "mentor"]}
+  ]
+}
