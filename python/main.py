@@ -72,40 +72,16 @@ import os
 import re
 import sys
 import time
-from dataclasses import dataclass, field
+from job import Job
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-
 import requests
-
-
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
-SITES = ["linkedin", "indeed", "jobstreet"]
-DEFAULT_LOCATION = "Philippines"
-DEFAULT_LIMIT = 30
-DEFAULT_DAYS = 30
-DEFAULT_MIN_MATCHES = 1
-DEFAULT_RETRIES = 3
-DEFAULT_RETRY_DELAY_SECONDS = 5
-DEFAULT_REQUEST_TIMEOUT_SECONDS = 20
-INDEED_COUNTRY = "Philippines"
-JOBSTREET_API_URL = "https://ph.jobstreet.com/api/jobsearch/v5/search"
-JOBSTREET_JOB_URL = "https://ph.jobstreet.com/job/{job_id}"
-JOBSTREET_SITE_KEY = "PH-Main"
-JOBSTREET_PAGE_SIZE = 30
-JOBSTREET_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
-}
-WORK_ARRANGEMENT_PATTERNS = [
-  ("hybrid", re.compile(r"\bhybrid\b", re.IGNORECASE)),
-  ("remote", re.compile(
-    r"\b(?:remote|work[\s-]from[\s-]home|wfh)\b", re.IGNORECASE)),
-  ("onsite", re.compile(
-    r"\b(?:on[\s-]?site|in[\s-]office|office[\s-]based)\b", re.IGNORECASE)),
-]
-
+from config import (
+  SITES, DEFAULT_LOCATION, DEFAULT_LIMIT, DEFAULT_DAYS,
+  DEFAULT_MIN_MATCHES, DEFAULT_RETRIES, DEFAULT_RETRY_DELAY_SECONDS,
+  DEFAULT_REQUEST_TIMEOUT_SECONDS, INDEED_COUNTRY, JOBSTREET_API_URL,
+  JOBSTREET_JOB_URL, JOBSTREET_SITE_KEY, JOBSTREET_PAGE_SIZE,
+  JOBSTREET_HEADERS, WORK_ARRANGEMENT_PATTERNS)
 
 # ============================================================================
 # LOGGING
@@ -122,28 +98,7 @@ def configure_logging() -> None:
     stream=sys.stderr,
   )
 
-
 logger = logging.getLogger(__name__)
-
-
-# ============================================================================
-# DATA MODEL
-# ============================================================================
-@dataclass
-class Job:
-  """One job posting plus its skill-match result."""
-  title: str
-  company: str
-  url: str
-  site: str
-  posted: str = ""
-  text: str = ""
-  location: str = ""
-  work_type: str = "unknown"
-  matched: list[str] = field(default_factory=list)
-  score: str = ""
-  score_pct: float = 0.0
-
 
 # ============================================================================
 # ARGUMENT PARSING
@@ -206,7 +161,6 @@ def build_parser() -> argparse.ArgumentParser:
 
   return parser
 
-
 # ============================================================================
 # CV HANDLING
 # ============================================================================
@@ -260,7 +214,6 @@ def load_skills(path) -> dict[str, list[str]]:
 
   return skills
 
-
 # ============================================================================
 # SKILL MATCHING
 # ============================================================================
@@ -285,7 +238,6 @@ def skill_pattern(terms) -> re.Pattern:
   return re.compile(
     r"(?<![A-Za-z0-9+#])(?:" + alternatives + r")(?![A-Za-z0-9+#&])",
     re.IGNORECASE)
-
 
 def grade_job(job, skills, patterns) -> Job:
   """
@@ -313,7 +265,6 @@ def grade_job(job, skills, patterns) -> Job:
 
   return job
 
-
 def grade_jobs(jobs, skills) -> list[Job]:
   """
   Grade all jobs and sort them by number of matched skills, best first.
@@ -335,7 +286,6 @@ def grade_jobs(jobs, skills) -> list[Job]:
 
   return sorted(graded, key=lambda job: len(job.matched), reverse=True)
 
-
 # ============================================================================
 # SEARCH LOGIC
 # ============================================================================
@@ -345,7 +295,6 @@ def clean_text(value) -> str:
     return ""
 
   return str(value)
-
 
 def search_jobspy(site, query, location, limit, days) -> list[Job]:
   """
@@ -414,7 +363,6 @@ def search_jobspy(site, query, location, limit, days) -> list[Job]:
 
   return jobs
 
-
 def fetch_jobstreet_page(params, retries, retry_delay) -> list[dict]:
   """
   Fetch one page of JobStreet PH search results.
@@ -458,7 +406,6 @@ def fetch_jobstreet_page(params, retries, retry_delay) -> list[dict]:
       time.sleep(retry_delay)
 
   return []
-
 
 def search_jobstreet(query, location, limit, days,
     retries=DEFAULT_RETRIES,
@@ -545,7 +492,6 @@ def search_jobstreet(query, location, limit, days,
 
   return jobs[:limit]
 
-
 def search_jobs(site, query, location, limit, days) -> list[Job]:
   """Dispatch the search to the scraper that handles `site`."""
   if site == "jobstreet":
@@ -595,7 +541,6 @@ def print_results(jobs) -> None:
     print(f"    Posted  : {job.posted or 'unknown'}")
     print(f"    URL     : {job.url}")
 
-
 def save_csv(jobs, path) -> None:
   """
   Save graded jobs to a CSV file.
@@ -617,17 +562,16 @@ def save_csv(jobs, path) -> None:
   with open(temp_path, "w", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
     writer.writerow(
-      ["Job Title", "Company", "Location", "Work Arrangement", "URL", "Posted", "Match", "Match %",
-       "Matched Skills"])
+      ["Job Title", "Company", "Location", "Work Arrangement", 
+       "URL", "Posted", "Match", "Match %", "Matched Skills"])
 
     for job in jobs:
       writer.writerow(
-        [job.title, job.company, job.location, job.work_type, job.url, job.posted, job.score,
-         job.score_pct, "; ".join(job.matched)])
+        [job.title, job.company, job.location, job.work_type, job.url, 
+         job.posted, job.score, job.score_pct, "; ".join(job.matched)])
 
   os.replace(temp_path, path)
   logger.info("SAVED %s rows to %s", len(jobs), path)
-
 
 # ============================================================================
 # MAIN
