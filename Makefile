@@ -6,10 +6,10 @@ DOCKERFILE ?= Dockerfile
 CONTEXT ?= .
 PORT ?= 8080
 CV ?= data/skills.json
-SITE ?= linkedin
+SITE ?= all
 LOCATION ?= Philippines
 DAYS ?= 30
-LIMIT ?= 30
+LIMIT ?= 100
 MIN_MATCHES ?= 3
 OUTPUT_DIR  ?= output
 SLUG := $(shell echo "$(QUERY)" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$$//g')
@@ -38,7 +38,7 @@ run:
 		$(IMAGE_NAME):$(IMAGE_TAG) \
 			python python/main.py \
 				--cv $(CV) \
-				--site $(SITE) \
+				$(if $(filter-out all,$(SITE)),--site $(SITE)) \
 				--query "$(QUERY)" \
 				--location "$(LOCATION)" \
 				--days $(DAYS) \

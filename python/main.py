@@ -137,8 +137,10 @@ def build_parser() -> argparse.ArgumentParser:
     formatter_class=argparse.RawDescriptionHelpFormatter)
   parser.add_argument("-c", "--cv", required=True, type=Path,
     help="Path to the CV skills JSON file.")
-  parser.add_argument("-s", "--site", required=True, choices=SITES,
-    help="Job site to search.")
+  parser.add_argument("-s", "--site", choices=SITES, default=None,
+    help=(
+      "Search only this job site. "
+      f"Default: all sites ({', '.join(SITES)})."))
   parser.add_argument("-q", "--query", required=True,
     help="Search keywords, e.g. \"embedded engineer\".")
   parser.add_argument("-l", "--location", default=DEFAULT_LOCATION,
@@ -295,6 +297,46 @@ def clean_text(value) -> str:
     return ""
 
   return str(value)
+
+def search_sites(sites, query, location, limit, days) -> tuple[list[Job], list[str]]:
+  """
+  Search each site in turn and combine the results.
+
+  A site that fails is logged and skipped, so one blocked or
+  rate-limited site does not discard the results from the others.
+
+  Parameters
+  ----------
+  sites : list[str]
+    Sites to search, in order.
+  query : str
+    Search keywords.
+  location : str
+    Job location.
+  limit : int
+    Maximum postings to fetch per site.
+  days : int
+    Only include postings from the last `days` days.
+
+  Returns
+  -------
+  tuple[list[Job], list[str]]
+    All postings found, and the names of the sites that failed.
+  """
+  jobs: list[Job] = []
+  failed: list[str] = []
+
+  for site in sites:
+    try:
+      logger.info("SEARCH site=%s", site)
+      site_jobs = search_jobs(site, query, location, limit, days)
+      logger.info("Fetched %s postings from %s", len(site_jobs), site)
+      jobs.extend(site_jobs)
+    except Exception:
+      logger.exception("Search failed for site=%s, continuing.", site)
+      failed.append(site)
+
+  return jobs, failed
 
 def search_jobspy(site, query, location, limit, days) -> list[Job]:
   """
@@ -581,36 +623,45 @@ def main() -> int:
   args = parser.parse_args()
   configure_logging()
 
+  sites = [args.site] if args.site else SITES
+
   logger.info("Job matching started")
-  logger.info("Site: %s", args.site)
+  logger.info("Sites: %s", ", ".join(sites))
   logger.info("Query: %s", args.query)
   logger.info("Location: %s", args.location)
   logger.info("Posted within: last %s days", args.days)
-  logger.info("Limit: %s", args.limit)
+  logger.info("Limit: %s per site", args.limit)
   logger.info("Minimum matches: %s", args.min_matches)
 
   try:
     skills = load_skills(args.cv)
     logger.info("Loaded %s skills: %s", len(skills), ", ".join(skills))
 
-    jobs = search_jobs(args.site, args.query, args.location, args.limit,
-      args.days)
-    logger.info("Fetched %s postings", len(jobs))
+    jobs, failed = search_sites(sites, args.query, args.location,
+      args.limit, args.days)
+    logger.info("Fetched %s postings in total", len(jobs))
+
+    if len(failed) == len(sites):
+      logger.error("All searches failed: %s", ", ".join(failed))
+      return 1
 
     jobs = grade_jobs(jobs, skills)
     shown = [job for job in jobs if len(job.matched) >= args.min_matches]
 
-    logger.info("SEARCH SUMMARY fetched=%s shown=%s hidden=%s",
-      len(jobs), len(shown), len(jobs) - len(shown))
+    logger.info("SEARCH SUMMARY fetched=%s shown=%s hidden=%s failed=%s",
+      len(jobs), len(shown), len(jobs) - len(shown), len(failed))
 
-    if not shown:
+    if shown:
+      print_results(shown)
+
+      if args.csv:
+        save_csv(shown, args.csv)
+    else:
       logger.warning("No jobs found matching your criteria.")
-      return 0
 
-    print_results(shown)
-
-    if args.csv:
-      save_csv(shown, args.csv)
+    if failed:
+      logger.error("Search failed for: %s", ", ".join(failed))
+      return 1
 
     return 0
   except KeyboardInterrupt:
